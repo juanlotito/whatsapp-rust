@@ -1177,6 +1177,19 @@ impl Client {
             } else {
                 self.resolve_encryption_jid(&to).await.to_non_ad()
             };
+            let recipient_is_lid = recipient_bare.is_lid();
+
+            // The outer `<message to>`, the DeviceSentMessage destinationJid, and
+            // the reporting-token remote jid must share the participants' namespace.
+            // WAWebSendMsgCreateFanoutStanza builds the whole stanza from one
+            // CHAT_JID, so for a LID-addressed peer the `to` is the resolved LID,
+            // not the caller's PN. A PN `to` over LID participants is rejected
+            // wholesale by the server with `ack error="400"`.
+            let stanza_to = if recipient_is_lid {
+                recipient_bare.clone()
+            } else {
+                to.clone()
+            };
 
             // Local registry first; network warm only on miss to avoid
             // unnecessary LID-migration side effects from get_user_devices
@@ -1257,7 +1270,7 @@ impl Client {
                 own_jid,
                 device_snapshot.lid.as_ref(),
                 device_snapshot.account.as_ref(),
-                to,
+                stanza_to,
                 message,
                 request_id,
                 edit,
